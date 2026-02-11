@@ -30,7 +30,7 @@ export interface DataFrame {
 
 // Sample demographic / health dataset
 export const sampleDataFrame: DataFrame = {
-  name: "encuesta_demografica_2024",
+  name: "centenarios_metabolomica",
   totalRows: 15420,
   totalColumns: 18,
   columns: [

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import {
   BarChart,
   Bar,
@@ -13,10 +13,11 @@ import {
   ReferenceLine,
 } from "recharts"
 import { Badge } from "@/components/ui/badge"
-import { useQuery } from "@tanstack/react-query"
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query"
 import { fetchCompleteness, CompletenessItem } from "@/lib/api"
 import { Loader2 } from "lucide-react"
 import type { DataFrameColumn } from "@/lib/dataframe-data"
+import { useInView } from "react-intersection-observer"
 
 type FilterType = "all" | "numeric" | "categorical" | "boolean" | "datetime"
 
@@ -75,12 +76,45 @@ interface CompletenessBarChartProps {
 export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
   const [filter, setFilter] = useState<FilterType>("all")
   const isClientMode = !!columns
+  const { ref, inView } = useInView()
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const queryClient = useQueryClient()
 
-  const { data: apiData, isLoading, isError } = useQuery({
-    queryKey: ["completeness"],
-    queryFn: fetchCompleteness,
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0
+    }
+  }, [filter])
+
+  const {
+    data: apiData,
+    isLoading,
+    isError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useInfiniteQuery({
+    queryKey: ["completeness_infinite", filter],
+    queryFn: ({ pageParam = 1 }) => fetchCompleteness({ pageParam, size: 20, dtype: filter }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.has_more ? lastPage.page + 1 : undefined),
     enabled: !isClientMode,
   })
+
+  useEffect(() => {
+    if (!isClientMode && inView && hasNextPage) {
+      fetchNextPage()
+    }
+  }, [isClientMode, inView, fetchNextPage, hasNextPage])
+
+  const handleFilterChange = (newFilter: FilterType) => {
+    if (!isClientMode) {
+      // Reset the cache for the new filter to ensure we start from page 1
+      // and don't trigger multiple requests for previously loaded pages
+      queryClient.removeQueries({ queryKey: ["completeness_infinite", newFilter] })
+    }
+    setFilter(newFilter)
+  }
 
   const filteredData = useMemo(() => {
     let rawItems: any[] = []
@@ -88,7 +122,7 @@ export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
     if (isClientMode) {
       rawItems = columns || []
     } else {
-      rawItems = apiData?.items || []
+      rawItems = apiData?.pages.flatMap(page => page.items) || []
     }
 
     const filtered =
@@ -114,6 +148,12 @@ export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
           totalRows,
         }
       })
+      // If we are sorting by completeness, backend should ideally do it,
+      // but if we rely on backend pagination, we get mixed sort if not sorted by backend.
+      // Assuming backend returns unsorted or sorted by variable for now.
+      // For chart visual, we might want to sort here, but with infinite scroll, 
+      // sorting client-side only affects loaded items.
+      // Re-sorting the accumulated list is fine.
       .sort((a: any, b: any) => a.validPercentage - b.validPercentage)
   }, [isClientMode, columns, apiData, filter])
 
@@ -141,6 +181,9 @@ export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
     )
   }
 
+  // Calculate distinct counts for summary
+  const totalCount = isClientMode ? columns!.length : apiData?.pages[0]?.total ?? 0
+
   return (
     <div className="rounded-xl border border-border bg-card p-5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -157,10 +200,10 @@ export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
             <button
               key={opt.value}
               type="button"
-              onClick={() => setFilter(opt.value)}
+              onClick={() => handleFilterChange(opt.value)}
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${filter === opt.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground hover:bg-muted"
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-secondary-foreground hover:bg-muted"
                 }`}
             >
               {opt.label}
@@ -185,14 +228,14 @@ export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
       </div>
 
       {filteredData.length > 0 ? (
-        <div className="relative w-full overflow-y-auto pr-2" style={{ maxHeight: "600px" }}>
-          {/* Dynamic height based on items count */}
-          <div style={{ height: Math.max(300, filteredData.length * 30) }}>
+        <div ref={scrollContainerRef} className="relative w-full overflow-y-auto pr-2" style={{ maxHeight: "600px" }}>
+          {/* Dynamic height based on items count, plus extra space for scroll loading */}
+          <div style={{ height: Math.max(300, filteredData.length * 30 + 50) }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={filteredData}
                 layout="vertical"
-                margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+                margin={{ top: 5, right: 30, left: 0, bottom: 50 }}
                 barCategoryGap="20%"
               >
                 <CartesianGrid
@@ -215,6 +258,7 @@ export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
                   tick={{ fill: "hsl(210, 40%, 96%)", fontSize: 11 }}
                   axisLine={{ stroke: "hsl(222, 47%, 14%)" }}
                   tickLine={false}
+                  interval={0}
                 />
                 <Tooltip
                   content={<CustomTooltip />}
@@ -248,6 +292,13 @@ export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
               </BarChart>
             </ResponsiveContainer>
           </div>
+
+          {/* Infinite Scroll Trigger */}
+          {!isClientMode && hasNextPage && (
+            <div ref={ref} className="py-2 flex justify-center">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex h-48 items-center justify-center">
@@ -257,7 +308,12 @@ export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
         </div>
       )}
 
-      <div className="mt-3 flex justify-end">
+      <div className="mt-3 flex justify-end gap-3 items-center">
+        {!isClientMode && (
+          <span className="text-xs text-muted-foreground">
+            Mostrando {filteredData.length} de {totalCount}
+          </span>
+        )}
         <Badge variant="secondary" className="bg-secondary text-secondary-foreground text-xs">
           {filteredData.length} variable{filteredData.length !== 1 ? "s" : ""}
         </Badge>

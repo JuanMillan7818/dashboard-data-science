@@ -216,8 +216,31 @@ export function VariableInspector({ columns }: VariableInspectorProps) {
                             >
                               {col.dtype}
                             </span>
+                            {col.valid_percentage !== undefined && (
+                              <span className="text-xs text-muted-foreground">
+                                {col.valid_percentage.toFixed(0)}%
+                              </span>
+                            )}
                           </div>
                         </div>
+
+                        {/* Completeness bar for API items */}
+                        {col.valid_percentage !== undefined && (
+                          <div className="mt-2 h-1.5 w-full rounded-full bg-secondary">
+                            <div
+                              className="h-1.5 rounded-full transition-all"
+                              style={{
+                                width: `${col.valid_percentage}%`,
+                                backgroundColor:
+                                  col.valid_percentage > 90
+                                    ? "hsl(160, 84%, 39%)"
+                                    : col.valid_percentage > 70
+                                      ? "hsl(35, 92%, 53%)"
+                                      : "hsl(346, 77%, 50%)",
+                              }}
+                            />
+                          </div>
+                        )}
 
                         {isExpanded && col.keywords && col.keywords.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
@@ -230,17 +253,24 @@ export function VariableInspector({ columns }: VariableInspectorProps) {
                           </div>
                         )}
 
+                        {isExpanded && col.valid_percentage !== undefined && (
+                          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3 text-xs">
+                            <div><span className="text-muted-foreground">Total:</span> <span className="font-mono text-foreground">{col.total_rows?.toLocaleString() ?? 0}</span></div>
+                            <div><span className="text-muted-foreground">Validos:</span> <span className="font-mono text-foreground">{col.non_null_count?.toLocaleString() ?? 0}</span></div>
+                            <div><span className="text-muted-foreground">Nulos:</span> <span className="font-mono text-foreground">{col.null_count?.toLocaleString() ?? 0}</span></div>
+                            <div><span className="text-muted-foreground">% Completitud:</span> <span className="font-mono text-foreground">{col.valid_percentage.toFixed(2)}%</span></div>
+                          </div>
+                        )}
+
                         {isExpanded && col.categories && col.categories.length > 0 && (
                           <div className="mt-3 border-t border-border pt-2">
                             <span className="text-xs font-medium text-muted-foreground mb-1 block">Categorias / Valores:</span>
                             <div className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-xs">
-                              <div className="font-mono text-muted-foreground border-b border-border/50 pb-1">Code</div>
-                              <div className="font-mono text-muted-foreground border-b border-border/50 pb-1">Value</div>
                               {col.categories.map((cat, idx) => (
-                                <>
-                                  <div key={`c-${idx}`} className="font-mono text-primary/80">{cat.code}</div>
-                                  <div key={`v-${idx}`} className="text-foreground">{cat.value}</div>
-                                </>
+                                <div key={idx} className="contents">
+                                  <div className="font-mono text-primary/80">{cat.code}</div>
+                                  <div className="text-foreground">{cat.value}</div>
+                                </div>
                               ))}
                             </div>
                           </div>

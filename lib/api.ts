@@ -11,6 +11,10 @@ export interface Variable {
     dtype: string
     categories?: Category[]
     keywords?: string[]
+    valid_percentage?: number
+    null_count?: number
+    non_null_count?: number
+    total_rows?: number
 }
 
 export interface VariableListResponse {
@@ -32,6 +36,10 @@ export interface CompletenessItem {
 
 export interface CompletenessResponse {
     items: CompletenessItem[]
+    total: number
+    page: number
+    size: number
+    has_more: boolean
 }
 
 export interface StatsItem {
@@ -78,8 +86,25 @@ export async function fetchVariables({
     return res.json()
 }
 
-export async function fetchCompleteness(): Promise<CompletenessResponse> {
-    const res = await fetch(`${API_URL}/graph/completeness`)
+export async function fetchCompleteness({
+    pageParam = 1,
+    size = 20,
+    dtype = "all",
+}: {
+    pageParam?: number
+    size?: number
+    dtype?: string
+} = {}): Promise<CompletenessResponse> {
+    const params = new URLSearchParams({
+        page: pageParam.toString(),
+        size: size.toString(),
+    })
+
+    if (dtype && dtype !== "all") {
+        params.append("dtype", dtype)
+    }
+
+    const res = await fetch(`${API_URL}/graph/completeness?${params.toString()}`)
     if (!res.ok) {
         throw new Error("Failed to fetch completeness stats")
     }
