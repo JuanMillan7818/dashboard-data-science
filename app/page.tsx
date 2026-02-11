@@ -24,6 +24,10 @@ const NAV_ITEMS = [
 type Section = (typeof NAV_ITEMS)[number]["id"]
 
 export default function DashboardPage() {
+  /**
+   * Estado para controlar la pestaña de sección actualmente activa.
+   * Opciones: "overview" (Resumen), "distribution" (Distribución), "categorical" (Categóricas), "variables" (Variables).
+   */
   const [activeSection, setActiveSection] = useState<Section>("overview")
   const df = sampleDataFrame
   const numericCols = getNumericColumns(df)
@@ -56,8 +60,13 @@ export default function DashboardPage() {
         </nav>
       </div>
 
-      {/* Content */}
+      {/* Contenido Principal */}
       <main className="p-6">
+        {/*
+          Renderizado Condicional: Sección Resumen
+          Se muestra cuando activeSection es "overview".
+          Contiene tarjetas de estadísticas, gráfica de completitud e inspector de variables.
+        */}
         {activeSection === "overview" && (
           <div className="space-y-6">
             <StatsCards />

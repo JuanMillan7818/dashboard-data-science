@@ -34,7 +34,10 @@ export function VariableInspector({ columns }: VariableInspectorProps) {
   const { ref, inView } = useInView()
   const [expandedVar, setExpandedVar] = useState<string | null>(null)
 
-  // Debounce search
+  /**
+   * Efecto: Debounce (retraso) de la entrada de búsqueda para evitar llamadas excesivas a la API.
+   * Actualiza 'debouncedSearch' 500ms después de que el usuario deja de escribir.
+   */
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search)
@@ -42,14 +45,18 @@ export function VariableInspector({ columns }: VariableInspectorProps) {
     return () => clearTimeout(timer)
   }, [search])
 
-  // Client-side mode
+  // Verificación de modo cliente (si se proporciona la propiedad columns)
   const isClientMode = !!columns
 
+  // Lógica de filtrado para Modo Cliente
   const clientFiltered = isClientMode
     ? columns?.filter((col) => col.name.toLowerCase().includes(search.toLowerCase()))
     : []
 
-  // API mode
+  /**
+   * Obtención de Datos: Consulta de Scroll Infinito para Variables
+   * Usa 'debouncedSearch' en queryKey para activar la recarga al actualizar la búsqueda.
+   */
   const {
     data,
     fetchNextPage,
@@ -64,6 +71,9 @@ export function VariableInspector({ columns }: VariableInspectorProps) {
     enabled: !isClientMode,
   })
 
+  /**
+   * Efecto: Disparar la carga de la siguiente página cuando el elemento centinela entra en vista.
+   */
   useEffect(() => {
     if (!isClientMode && inView && hasNextPage) {
       fetchNextPage()
@@ -96,7 +106,7 @@ export function VariableInspector({ columns }: VariableInspectorProps) {
 
       <div className="flex-1 overflow-y-auto pr-1 space-y-1.5">
         {isClientMode ? (
-          // Render Client Data
+          // Renderizado de Datos Cliente (Array local filtrado)
           clientFiltered?.length === 0 ? (
             <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
               No se encontraron variables
@@ -170,7 +180,8 @@ export function VariableInspector({ columns }: VariableInspectorProps) {
             })
           )
         ) : (
-          // Render API Data
+          // Renderizado de Datos API (Scroll Infinito con React Query)
+          // Maneja estados de carga (pending) y error antes de mostrar la lista
           status === "pending" ? (
             <div className="flex h-full items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -224,7 +235,11 @@ export function VariableInspector({ columns }: VariableInspectorProps) {
                           </div>
                         </div>
 
-                        {/* Completeness bar for API items */}
+                        {/* 
+                          Barra de Completitud para items de API
+                          Se muestra solo si valid_percentage está definido.
+                          Cambia de color din&aacute;micamente según el porcentaje (>90 verde, >70 amarillo, <70 rojo).
+                        */}
                         {col.valid_percentage !== undefined && (
                           <div className="mt-2 h-1.5 w-full rounded-full bg-secondary">
                             <div

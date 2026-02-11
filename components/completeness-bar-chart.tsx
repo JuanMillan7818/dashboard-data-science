@@ -80,12 +80,21 @@ export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
 
+  /**
+   * Efecto: Reiniciar posición de scroll al inicio cuando cambia el filtro.
+   * Esto asegura que el usuario vea los primeros elementos de los nuevos resultados filtrados.
+   */
   useEffect(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = 0
     }
   }, [filter])
 
+  /**
+   * Obtención de Datos: Consulta de Scroll Infinito
+   * Obtiene datos de completitud en páginas de 20 elementos.
+   * El estado 'filter' es parte de la queryKey para separar cachés por tipo de filtro.
+   */
   const {
     data: apiData,
     isLoading,
@@ -101,21 +110,37 @@ export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
     enabled: !isClientMode,
   })
 
+  /**
+   * Efecto: Disparar la carga de la siguiente página cuando el elemento centinela entra en vista.
+   */
   useEffect(() => {
     if (!isClientMode && inView && hasNextPage) {
       fetchNextPage()
     }
   }, [isClientMode, inView, fetchNextPage, hasNextPage])
 
+  /**
+   * Maneja los cambios de filtro por interacción del usuario.
+   * CRÍTICO: Invalida la caché de consulta específica para el nuevo filtro.
+   * Esto garantiza que al cambiar de filtro siempre se carguen datos frescos desde la página 1,
+   * evitando estados obsoletos de navegaciones anteriores.
+   */
   const handleFilterChange = (newFilter: FilterType) => {
     if (!isClientMode) {
-      // Reset the cache for the new filter to ensure we start from page 1
-      // and don't trigger multiple requests for previously loaded pages
+      // Reiniciar la caché para el nuevo filtro para asegurar que empezamos desde la página 1
+      // y no disparamos múltiples solicitudes para páginas cargadas previamente
       queryClient.removeQueries({ queryKey: ["completeness_infinite", newFilter] })
     }
     setFilter(newFilter)
   }
 
+  /**
+   * Lógica de Filtrado, Normalización y Ordenamiento (Memorizada)
+   * 1. Combina datos de entrada (Cliente o API).
+   * 2. Filtra por tipo de dato (dtype) si es necesario.
+   * 3. Normaliza nombres de claves (snake_case de API vs camelCase de Cliente).
+   * 4. Ordena por porcentaje de validez ascendente para visualización en gráfico.
+   */
   const filteredData = useMemo(() => {
     let rawItems: any[] = []
 
@@ -132,7 +157,7 @@ export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
 
     return filtered
       .map((col: any) => {
-        // Normalize fields
+        // Normalizar campos (manejar snake_case de API y camelCase de local)
         const validPercentage = col.validPercentage ?? col.valid_percentage ?? 0
         const nullCount = col.nullCount ?? col.null_count ?? 0
         const nonNullCount = col.nonNullCount ?? col.non_null_count ?? 0
@@ -148,12 +173,7 @@ export function CompletenessBarChart({ columns }: CompletenessBarChartProps) {
           totalRows,
         }
       })
-      // If we are sorting by completeness, backend should ideally do it,
-      // but if we rely on backend pagination, we get mixed sort if not sorted by backend.
-      // Assuming backend returns unsorted or sorted by variable for now.
-      // For chart visual, we might want to sort here, but with infinite scroll, 
-      // sorting client-side only affects loaded items.
-      // Re-sorting the accumulated list is fine.
+      // Ordenar por porcentaje de validez (menor a mayor)
       .sort((a: any, b: any) => a.validPercentage - b.validPercentage)
   }, [isClientMode, columns, apiData, filter])
 

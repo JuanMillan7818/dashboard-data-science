@@ -10,16 +10,21 @@ interface StatsCardsProps {
 }
 
 export function StatsCards({ dataframe }: StatsCardsProps) {
+  // Determina si estamos en Modo Cliente (se pasa un dataframe estático) o Modo API (se obtienen datos del backend)
   const isClientMode = !!dataframe
 
-  // API Mode Data
+  /**
+   * Obtención de Datos en Modo API
+   * Obtiene estadísticas globales desde el endpoint del backend /api/v1/graph/stats.
+   * Solo se habilita si la propiedad dataframe NO se proporciona.
+   */
   const { data: apiStats, isLoading, isError } = useQuery({
     queryKey: ["stats"],
     queryFn: fetchStats,
     enabled: !isClientMode,
   })
 
-  // Calculate Client Mode Data
+  // Calcular Datos en Modo Cliente (si se proporciona dataframe)
   const clientStats = isClientMode ? {
     numeric: dataframe.columns.filter((c) => c.dtype === "numeric").length,
     categorical: dataframe.columns.filter((c) => c.dtype === "categorical").length,
@@ -32,7 +37,7 @@ export function StatsCards({ dataframe }: StatsCardsProps) {
     })()
   } : null
 
-  // Consolidate data for rendering
+  // Consolidar datos para renderizado basado en el modo activo
   const displayStats = isClientMode ? [
     { label: "Numericas", value: clientStats!.numeric, icon: Hash, color: "hsl(199, 89%, 48%)" },
     { label: "Categoricas", value: clientStats!.categorical, icon: Type, color: "hsl(160, 84%, 39%)" },
@@ -69,6 +74,11 @@ export function StatsCards({ dataframe }: StatsCardsProps) {
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      {/*
+        Renderizado de Tarjetas:
+        Mapeamos el array 'displayStats' para generar una tarjeta por cada tipo de dato (Numérica, Categórica, etc.).
+        Cada tarjeta muestra el icono, etiqueta y valor correspondiente.
+      */}
       {displayStats.map((stat) => (
         <div
           key={stat.label}
