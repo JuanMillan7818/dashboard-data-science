@@ -100,13 +100,35 @@ export async function fetchCompleteness({
         size: size.toString(),
     })
 
-    if (dtype && dtype !== "all") {
-        params.append("dtype", dtype)
-    }
-
-    const res = await fetch(`${API_URL}/graph/completeness?${params.toString()}`)
+    // Usar el endpoint /graph/variables que tiene los datos de completitud
+    // Sin el parámetro dtype para evitar errores
+    const res = await fetch(`${API_URL}/graph/variables?${params.toString()}`)
     if (!res.ok) {
         throw new Error("Failed to fetch completeness stats")
     }
     return res.json()
+}
+
+
+export interface DatasetInfo {
+    total_variables: number
+    total_rows: number
+    columns: string[]
+}
+
+export async function fetchDatasetInfo(): Promise<DatasetInfo> {
+    const res = await fetch(`${API_URL}/graph/dataset/info`)
+    if (!res.ok) {
+        throw new Error("Failed to fetch dataset info")
+    }
+    return res.json()
+}
+
+export async function fetchNumericStats(): Promise<any[]> {
+    const res = await fetch(`${API_URL}/graph/numeric/stats`)
+    if (!res.ok) {
+        throw new Error("Failed to fetch numeric stats")
+    }
+    const data = await res.json()
+    return data.variables || []
 }

@@ -1,23 +1,28 @@
 "use client"
 
 import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { BarChart3, BoxSelect, Radar, List } from "lucide-react"
 import {
   sampleDataFrame,
   getNumericColumns,
   getCategoricalColumns,
 } from "@/lib/dataframe-data"
+import { fetchDatasetInfo, fetchNumericStats } from "@/lib/api"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { StatsCards } from "@/components/stats-cards"
 import { CompletenessBarChart } from "@/components/completeness-bar-chart"
-import { BoxplotChart } from "@/components/boxplot-chart"
+import { NumericBoxplot } from "@/components/numeric-boxplot-native"
+import { SingleNumericBoxplot } from "@/components/single-numeric-boxplot"
+import { CategoricalBarChart } from "@/components/categorical-bar-chart"
+import { SingleCategoricalChart } from "@/components/single-categorical-chart"
+import { SingleBooleanChart } from "@/components/single-boolean-chart"
 import { CategoryRadarChart } from "@/components/category-radar-chart"
 import { VariableInspector } from "@/components/variable-inspector"
 
 const NAV_ITEMS = [
   { id: "overview", label: "Resumen", icon: BarChart3 },
-  { id: "distribution", label: "Distribucion", icon: BoxSelect },
-  { id: "categorical", label: "Categoricas", icon: Radar },
+  { id: "numeric", label: "Numéricas", icon: BoxSelect },
   { id: "variables", label: "Variables", icon: List },
 ] as const
 
@@ -29,9 +34,28 @@ export default function DashboardPage() {
    * Opciones: "overview" (Resumen), "distribution" (Distribución), "categorical" (Categóricas), "variables" (Variables).
    */
   const [activeSection, setActiveSection] = useState<Section>("overview")
-  const df = sampleDataFrame
-  const numericCols = getNumericColumns(df)
-  const categoricalCols = getCategoricalColumns(df)
+  
+  // Obtener datos dinámicos del dataset
+  const { data: datasetInfo } = useQuery({
+    queryKey: ["dataset-info"],
+    queryFn: fetchDatasetInfo,
+  })
+  
+  // Crear DataFrame dinámico con los datos de la API
+  const df = datasetInfo ? {
+    name: "Datos centenarios",
+    totalRows: datasetInfo.total_rows,
+    totalColumns: datasetInfo.total_variables,
+    columns: [] // Se llenará dinámicamente según sea necesario
+  } : sampleDataFrame
+  
+  // Obtener variables numéricas de la API
+  const { data: numericVars } = useQuery({
+    queryKey: ["numeric-stats"],
+    queryFn: fetchNumericStats,
+  })
+  
+  const numericCols = numericVars || getNumericColumns(df)
 
   return (
     <div className="min-h-screen bg-background">
@@ -81,24 +105,9 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {activeSection === "distribution" && (
+        {activeSection === "numeric" && (
           <div className="space-y-6">
-            <StatsCards dataframe={df} />
-            <BoxplotChart numericColumns={numericCols} />
-          </div>
-        )}
-
-        {activeSection === "categorical" && (
-          <div className="space-y-6">
-            <StatsCards dataframe={df} />
-            <div className="grid gap-6 xl:grid-cols-3">
-              <div className="xl:col-span-2">
-                <CategoryRadarChart categoricalColumns={categoricalCols} />
-              </div>
-              <div>
-                <VariableInspector columns={categoricalCols} />
-              </div>
-            </div>
+            <NumericBoxplot variables={numericCols || []} />
           </div>
         )}
 

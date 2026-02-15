@@ -52,7 +52,7 @@ export function StatsCards({ dataframe }: StatsCardsProps) {
 
   const completeness = isClientMode
     ? clientStats!.completeness.toFixed(1)
-    : apiStats?.completeness.toFixed(1) ?? "0.0"
+    : (apiStats?.completeness ?? 0).toFixed(1)
 
   if (!isClientMode && isLoading) {
     return (
